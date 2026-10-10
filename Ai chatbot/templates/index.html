@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smart ChatBot</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --paper: #eef2f6;
+            --ink: #14233b;
+            --muted: #5d6b82;
+            --line: #d5dde8;
+            --card: #ffffff;
+            --bot: #e4ebf4;
+            --accent: #f2a31b;
+            --accent-dark: #c9820a;
+            --focus: #1d5fd1;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body { height: 100%; }
+
+        body {
+            margin: 0;
+            font-family: "DM Sans", "Segoe UI", Arial, sans-serif;
+            color: var(--ink);
+            background: var(--paper);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            line-height: 1.5;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Slow floating shapes in the background */
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            border-radius: 50%;
+            z-index: 0;
+            pointer-events: none;
+            filter: blur(2px);
+        }
+
+        body::before {
+            width: 340px;
+            height: 340px;
+            background: rgba(242, 163, 27, 0.22);
+            top: -90px;
+            left: -90px;
+            animation: drift1 14s ease-in-out infinite alternate;
+        }
+
+        body::after {
+            width: 420px;
+            height: 420px;
+            background: rgba(29, 95, 209, 0.14);
+            bottom: -140px;
+            right: -120px;
+            animation: drift2 18s ease-in-out infinite alternate;
+        }
+
+        @keyframes drift1 {
+            from { transform: translate(0, 0) scale(1); }
+            to   { transform: translate(120px, 90px) scale(1.15); }
+        }
+
+        @keyframes drift2 {
+            from { transform: translate(0, 0) scale(1); }
+            to   { transform: translate(-110px, -80px) scale(1.2); }
+        }
+
+        .chat {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 560px;
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            box-shadow: 0 18px 50px rgba(20, 35, 59, 0.12);
+            overflow: hidden;
+            animation: cardIn 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        }
+
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.97); }
+            to   { opacity: 1; transform: none; }
+        }
+
+        /* ---------- Header ---------- */
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 20px 24px;
+            background: var(--ink);
+            color: #fff;
+        }
+
+        .avatar {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: var(--ink);
+            display: grid;
+            place-items: center;
+            font-family: "Bricolage Grotesque", "Segoe UI", sans-serif;
+            font-weight: 700;
+            font-size: 22px;
+            flex-shrink: 0;
+            position: relative;
+            animation: bob 3s ease-in-out infinite;
+        }
+
+        /* Green "online" dot that pulses */
+        .avatar::after {
+            content: "";
+            position: absolute;
+            right: -1px;
+            bottom: -1px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #2ecc71;
+            border: 2px solid var(--ink);
+            animation: pulse 1.8s ease-out infinite;
+        }
+
+        @keyframes bob {
+            0%, 100% { transform: translateY(0); }
+            50%      { transform: translateY(-4px); }
+        }
+
+        @keyframes pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+            100% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
+        }
+
+        .chat-header h1 {
+            margin: 0;
+            font-family: "Bricolage Grotesque", "Segoe UI", sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+
+        .chat-header p {
+            margin: 2px 0 0;
+            font-size: 14px;
+            color: #b9c6da;
+        }
+
+        /* ---------- Messages ---------- */
+        .messages {
+            padding: 24px;
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .bubble {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            background: var(--bot);
+            border-bottom-left-radius: 4px;
+            overflow-wrap: anywhere;
+        }
+
+        .bubble.greeting {
+            background: var(--accent);
+            font-weight: 600;
+        }
+
+        .bubble.bye {
+            background: var(--ink);
+            color: #fff;
+        }
+
+        .empty {
+            margin: auto 0;
+            color: var(--muted);
+        }
+
+        .empty strong {
+            display: block;
+            color: var(--ink);
+            font-family: "Bricolage Grotesque", "Segoe UI", sans-serif;
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        /* Greeting pops in first */
+        .bubble.reply {
+            opacity: 0;
+            animation: pop 0.4s ease-out forwards;
+        }
+
+        .bubble.greeting.reply { animation-delay: 0.1s; }
+
+        /* Typing dots and the real answer share the same spot */
+        .stack { display: grid; }
+
+        .stack > * {
+            grid-area: 1 / 1;
+            justify-self: start;
+            align-self: start;
+        }
+
+        .typing {
+            display: flex;
+            gap: 5px;
+            padding: 15px 18px;
+            background: var(--bot);
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            opacity: 0;
+            animation: typingLife 1.3s ease forwards;
+            animation-delay: 0.5s;
+        }
+
+        .typing span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--muted);
+            animation: hop 0.8s ease-in-out infinite;
+        }
+
+        .typing span:nth-child(2) { animation-delay: 0.15s; }
+        .typing span:nth-child(3) { animation-delay: 0.3s; }
+
+        /* The answer appears after the dots disappear */
+        .bubble.answer.reply { animation-delay: 1.8s; }
+
+        @keyframes pop {
+            from { opacity: 0; transform: translateY(10px) scale(0.96); }
+            to   { opacity: 1; transform: none; }
+        }
+
+        @keyframes typingLife {
+            0%   { opacity: 0; }
+            12%  { opacity: 1; }
+            88%  { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
+
+        @keyframes hop {
+            0%, 100% { transform: translateY(0); opacity: 0.5; }
+            50%      { transform: translateY(-6px); opacity: 1; }
+        }
+
+        /* ---------- Form ---------- */
+        form {
+            padding: 20px 24px 24px;
+            border-top: 1px solid var(--line);
+            display: grid;
+            gap: 14px;
+            background: #fafbfd;
+        }
+
+        label {
+            display: grid;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 14px;
+            font: inherit;
+            font-weight: 400;
+            color: var(--ink);
+            background: #fff;
+            border: 1.5px solid var(--line);
+            border-radius: 12px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(242, 163, 27, 0.2);
+            transform: translateY(-1px);
+        }
+
+        input[type="text"]::placeholder { color: #9aa7bb; }
+
+        input[type="text"]:focus-visible,
+        button:focus-visible {
+            outline: 3px solid var(--focus);
+            outline-offset: 2px;
+        }
+
+        button {
+            padding: 13px 18px;
+            font: inherit;
+            font-weight: 600;
+            color: var(--ink);
+            background: var(--accent);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            background: var(--accent-dark);
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 18px rgba(201, 130, 10, 0.35);
+        }
+
+        button:active {
+            transform: translateY(0) scale(0.97);
+            box-shadow: none;
+        }
+
+        button.sending { opacity: 0.7; pointer-events: none; }
+
+        @media (max-width: 480px) {
+            body { padding: 0; align-items: stretch; }
+            .chat { border-radius: 0; border: none; max-width: none; }
+            .bubble { max-width: 92%; }
+        }
+
+        /* People who turn off motion in their system get no animation */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation: none !important;
+                transition: none !important;
+            }
+            .bubble.reply { opacity: 1; }
+            .typing { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <main class="chat">
+
+        <header class="chat-header">
+            <div class="avatar" aria-hidden="true">S</div>
+            <div>
+                <h1>Smart ChatBot</h1>
+                <p>Ask me a question and I will reply.</p>
+            </div>
+        </header>
+
+        <section class="messages" aria-live="polite">
+            {% if greeting or bot_response %}
+
+                {% if greeting %}
+                    <div class="bubble greeting reply">{{ greeting }}</div>
+                {% endif %}
+
+                {% if bot_response %}
+                    <div class="stack">
+                        <div class="typing" aria-hidden="true">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <div class="bubble answer reply {% if 'Goodbye' in bot_response %}bye{% endif %}">
+                            {{ bot_response }}
+                        </div>
+                    </div>
+                {% endif %}
+
+            {% else %}
+                <div class="empty">
+                    <strong>Say hello to start.</strong>
+                    Enter your name and a question below, then press Send.
+                </div>
+            {% endif %}
+        </section>
+
+        <form method="POST" action="/">
+            <label>
+                Your name
+                <input type="text" name="name" placeholder="For example, Aadarsh"
+                       value="{{ name }}" autocomplete="given-name" required>
+            </label>
+
+            <label>
+                Your question
+                <input type="text" name="question" placeholder="Try: hello, who are you, how are you"
+                       autocomplete="off" required>
+            </label>
+
+            <button type="submit">Send</button>
+        </form>
+
+    </main>
+
+    <script>
+        // Button shows "Sending..." for a moment while the page reloads
+        document.querySelector("form").addEventListener("submit", function () {
+            var btn = this.querySelector("button");
+            btn.textContent = "Sending...";
+            btn.classList.add("sending");
+        });
+    </script>
+</body>
+</html>
